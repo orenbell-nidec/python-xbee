@@ -47,6 +47,8 @@ class ApiFrameType(Enum):
     TX_STATUS = (0x89, "TX (Transmit) Status")
     MODEM_STATUS = (0x8A, "Modem Status")
     TRANSMIT_STATUS = (0x8B, "Transmit Status")
+    ROUTE_INFO = (0x8D, "Route Information")
+    AGGREGATE_ADDRESSING_UPDATE = (0x8E, "Aggregate Addressing Update")
     IO_DATA_SAMPLE_RX_INDICATOR_WIFI = (0x8F, "IO Data Sample RX Indicator (Wi-Fi)")
     RECEIVE_PACKET = (0x90, "Receive Packet")
     EXPLICIT_RX_INDICATOR = (0x91, "Explicit RX Indicator")

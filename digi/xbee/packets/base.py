@@ -74,6 +74,12 @@ class DictKeys(Enum):
     PATH = "path"
     CONTENT_TYPE_LENGTH = "content_type_length"
     CONTENT_TYPE = "content_type"
+    SOURCE_EVENT = "source_event"
+    DATA_LENGTH = "data_length"
+    TIMESTAMP = "timestamp"
+    TIMEOUT_COUNT = "timeout_count"
+    RESP_ENDPOINT = "resp_endpoint"
+    RECV_ENDPOINT = "recv_endpoint"
 
 
 class XBeePacket:
@@ -84,8 +90,6 @@ class XBeePacket:
     
     Generic actions like checksum compute or packet length calculation is performed here.
     """
-
-    __HASH_SEED = 23
 
     __metaclass__ = ABCMeta
     __ESCAPE_BYTES = [i.value for i in SpecialByte]
@@ -120,7 +124,7 @@ class XBeePacket:
             Dictionary: the packet information.
         """
         return str(self.to_dict())
-
+    
     def __eq__(self, other):
         """
         Returns whether the given object is equal to this one.
@@ -431,7 +435,7 @@ class XBeeAPIPacket(XBeePacket):
         if len(raw) < min_length:
                 raise InvalidPacketException("Bytearray must have, at least, 5 of complete length (header, length, "
                                              "frameType, checksum)")
-
+    
         if raw[0] & 0xFF != SpecialByte.HEADER_BYTE.code:
             raise InvalidPacketException("Bytearray must start with the header byte (SpecialByte.HEADER_BYTE.code)")
 

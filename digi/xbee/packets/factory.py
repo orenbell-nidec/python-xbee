@@ -153,6 +153,12 @@ def build_frame(packet_bytearray, operating_mode=OperatingMode.API_MODE):
     elif frame_type == ApiFrameType.TX_STATUS:
         return TXStatusPacket.create_packet(packet_bytearray, operating_mode)
 
+    elif frame_type == ApiFrameType.ROUTE_INFO:
+        return RouteInfoPacket.create_packet(packet_bytearray, operating_mode)
+    
+    elif frame_type == ApiFrameType.AGGREGATE_ADDRESSING_UPDATE:
+        return AggregateAddressingUpdatePacket.create_packet(packet_bytearray, operating_mode)
+
     elif frame_type == ApiFrameType.RX_IO_16:
         return RX16IOPacket.create_packet(packet_bytearray, operating_mode)
 

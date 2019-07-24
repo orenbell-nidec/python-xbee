@@ -1895,6 +1895,336 @@ class ModemStatusPacket(XBeeAPIPacket):
     modem_status = property(__get_modem_status, __set_modem_status)
     """:class:`.ModemStatus`. Modem status event."""
 
+#######################################################################################################
+class RouteInfoPacket(XBeeAPIPacket):
+    """
+    This class represents a route information packet. Packet is built using
+    the parameters of the constructor or providing a valid raw byte array.
+
+    A route information packet is sent after a transmit request when the latter's
+    options requests so. One route information packet is sent by each node the
+    transmit request passes through.
+    
+    This packet is the response to standard and explicit transmit requests.
+
+    .. seealso::
+       | :class:`.RouteInfoPacket`
+    """
+
+    __MIN_PACKET_LENGTH = 46
+
+    def __init__(self, source_event, data_length, timestamp, timeout_count, dest_addr, src_addr, resp_addr, recv_addr):
+        """
+        Class constructor. Instantiates a new :class:`.RouteInfoPacket` object with the provided parameters.
+        
+        Args:
+            source_event (Integer): 8-bit representing source event. 0x11=NACK, 0x12=Trace route
+            data_length (Integer): Number of bytes that follow, excluding checksum. Generally fixed, but may increase in future versions
+            timestamp (Integer): System timer value on the node when generating this packet. Between 0 and FFFF FFFF.
+            timeout_count (Integer): The number of MAC ACK timeouts that occurred
+            dest_addr (:class:`.XBee64BitAddress`): Address of the source node, ie the node that the transmit request was directed at
+            src_addr (:class:`.XBee64BitAddress`): Address of the final destination, ie the node that sent the transmit request
+            resp_addr (:class:`.XBee64BitAddress`): Address of the node that generated this packet
+            recv_addr (:class:`.XBee64BitAddress`): Address of the next node on the path to the source node
+
+        Raises:
+            ValueError: if ``source_event`` is less than 0 or greater than 255.
+            ValueError: if ``data_length`` is less than 0 or greater than 255.
+            ValueError: if ``timestamp`` is less than 0 or greater than 0xFFFF FFFF.
+            ValueError: if ``timeout_count`` is less than 0 or greater than 255.
+
+        .. seealso::
+           | :class:`.XBee64BitAddress`
+           | :class:`.XBeeAPIPacket`
+        """
+        if source_event < 0 or source_event > 255:
+            raise ValueError("Source event must be between 0 and 255.")
+        if data_length < 0 or data_length > 255:
+            raise ValueError("Data length must be between 0 and 255.")
+        if timestamp < 0 or timestamp > 0xFFFFFFFF:
+            raise ValueError("Timestamp must be between 0 and 0xFFFF FFFF.")
+        if timeout_count < 0 or timeout_count > 255:
+            raise ValueError("Timeout must be between 0 and 255.")
+
+        super().__init__(ApiFrameType.ROUTE_INFO)
+        self.__source_event = source_event
+        self.__data_length = data_length
+        self.__timestamp = timestamp
+        self.__timeout_count = timeout_count
+        self.__dest_addr = dest_addr
+        self.__src_addr = src_addr
+        self.__resp_addr = resp_addr
+        self.__recv_addr = recv_addr
+
+    @staticmethod
+    def create_packet(raw, operating_mode):
+        """
+        Override method.
+        
+        Returns:
+            :class:`.RouteInfoPacket`
+            
+        Raises:
+            InvalidPacketException: if the bytearray length is less than 46. (start delim. + length (2 bytes) + frame
+                type + source event + data length + 32 bit timestamp + timeout count + 2 reserved bytes +
+                64 bit destination address + 64 bit source address + 64 bit responder address + 64 bit receiver address +
+                checksum =
+                46 bytes).
+            InvalidPacketException: if the length field of 'raw' is different than its real length. (length field: bytes
+                2 and 3)
+            InvalidPacketException: if the first byte of 'raw' is not the header byte. See :class:`.SpecialByte`.
+            InvalidPacketException: if the calculated checksum is different than the checksum field value (last byte).
+            InvalidPacketException: if the frame type is not :attr:`.ApiFrameType.ROUTE_INFO`.
+            InvalidOperatingModeException: if ``operating_mode`` is not supported.
+            
+        .. seealso::
+           | :meth:`.XBeePacket.create_packet`
+           | :meth:`.XBeeAPIPacket._check_api_packet`
+        """
+        if operating_mode != OperatingMode.ESCAPED_API_MODE and operating_mode != OperatingMode.API_MODE:
+            raise InvalidOperatingModeException(operating_mode.name + " is not supported.")
+        
+        if operating_mode == OperatingMode.ESCAPED_API_MODE:
+            raw = XBeePacket.unescape_data(raw)
+
+        XBeeAPIPacket._check_api_packet(raw, min_length=RouteInfoPacket.__MIN_PACKET_LENGTH)
+
+        if raw[3] != ApiFrameType.ROUTE_INFO.code:
+            raise InvalidPacketException("This packet is not a transmit status packet.")
+
+        return RouteInfoPacket(raw[4], raw[5], utils.bytes_to_int(raw[6:10]), raw[10],
+                                    XBee64BitAddress(raw[13:21]), XBee64BitAddress(raw[21:29]),
+                                    XBee64BitAddress(raw[29:37]), XBee64BitAddress(raw[37:45]))
+
+    def needs_id(self):
+        """
+        Override method.
+
+        .. seealso::
+           | :meth:`.XBeeAPIPacket.needs_id`
+        """
+        return False
+
+    def _get_api_packet_spec_data(self):
+        """
+        Override method.
+
+        .. seealso::
+           | :meth:`.XBeeAPIPacket._get_api_packet_spec_data`
+        """
+        ret = [self.__source_event]
+        ret.append(self.__data_length)
+        ret.append(self.__timestamp)
+        ret.append(self.__timeout_count)
+        ret.append(bytearray([0,0]))
+        ret.append(self.__dest_addr.address)
+        ret.append(self.__src_addr.address)
+        ret.append(self.__resp_addr.address)
+        ret.append(self.__recv_addr.address)
+        return ret
+
+    def _get_api_packet_spec_data_dict(self):
+        """
+        Override method.
+
+        .. seealso::
+           | :meth:`.XBeeAPIPacket._get_api_packet_spec_data_dict`
+        """
+        return {DictKeys.SOURCE_EVENT: self.__source_event,
+                DictKeys.DATA_LENGTH: self.__data_length,
+                DictKeys.TIMESTAMP: self.__timestamp,
+                DictKeys.TIMEOUT_COUNT: self.__timeout_count,
+                DictKeys.RESERVED: 0,
+                DictKeys.DEST_ENDPOINT: self.__dest_addr,
+                DictKeys.SOURCE_ENDPOINT: self.__src_addr,
+                DictKeys.RESP_ENDPOINT: self.__resp_addr,
+                DictKeys.RECV_ENDPOINT: self._recv_addr}
+
+    def __get_source_event(self):
+        """
+        Returns the source event
+
+        Returns:
+            :class:`.Integer`: the 8-bit source event
+        """
+        return self.__source_event
+
+    def __set_source_event(self, source_event):
+        """
+        Sets the source event
+
+        Args:
+            source_event (:class:`.Integer`:) the 8-bit source event
+        """
+        self.__source_event = source_event
+
+    def __get_data_length(self):
+        """
+        Returns the length of the subsequent bytes, excluding checksum (constant
+        for a given revision of this API)
+
+        Returns:
+            :class:`.Integer`: the length of subsequent bytes, excluding checksum
+        """
+        return self.__data_length
+
+    def __get_timestamp(self):
+        """
+        Returns the timestamp of the packet
+
+        Returns:
+            Integer: the timestamp of the packet
+        """
+        return self.__timestamp
+
+    def __set_timestamp(self, timestamp):
+        """
+        Sets timestamp of the packet
+
+        Args:
+            timestamp (Integer): the new timestamp of the packet
+        """
+        self.__timestamp = timestamp
+
+    def __get_timeout_count(self):
+        """
+        Returns the timeout
+
+        Returns:
+            :class:`.Integer`: the discovery status.
+        """
+        return self.__timeout_count
+
+    def __set_timeout_count(self, timeout_count):
+        """
+        Sets the timeout
+
+        Args:
+            timeout_count (:class:`.Integer`): the timeout
+        """
+        self.__timeout_count = timeout_count
+
+    def __get_dest_addr(self):
+        """
+        Returns the 64-bit destination address.
+
+        Returns:
+            :class:`XBee64BitAddress`: the 64-bit destination address.
+
+        .. seealso::
+           | :class:`.XBee64BitAddress`
+        """
+        return self.__dest_addr
+
+    def __set_dest_addr(self, dest_addr):
+        """
+        Sets the 64-bit destination address.
+
+        Args:
+            x64bit_addr (:class:`.XBee64BitAddress`): the new 64-bit destination address.
+
+        .. seealso::
+           | :class:`.XBee64BitAddress`
+        """
+        self.__dest_addr = dest_addr
+
+    def __get_src_addr(self):
+        """
+        Returns the 64-bit source address.
+
+        Returns:
+            :class:`XBee64BitAddress`: the 64-bit source address.
+
+        .. seealso::
+           | :class:`.XBee64BitAddress`
+        """
+        return self.__src_addr
+
+    def __set_src_addr(self, src_addr):
+        """
+        Sets the 64-bit source address.
+
+        Args:
+            src_addr (:class:`.XBee64BitAddress`): the new 64-bit source address.
+
+        .. seealso::
+           | :class:`.XBee64BitAddress`
+        """
+        self.__src_addr = src_addr
+
+    def __get_resp_addr(self):
+        """
+        Returns the 64-bit responder address.
+
+        Returns:
+            :class:`XBee64BitAddress`: the 64-bit responder address.
+
+        .. seealso::
+           | :class:`.XBee64BitAddress`
+        """
+        return self.__resp_addr
+
+    def __set_resp_addr(self, resp_addr):
+        """
+        Sets the 64-bit responder address.
+
+        Args:
+            src_addr (:class:`.XBee64BitAddress`): the new 64-bit responder address.
+
+        .. seealso::
+           | :class:`.XBee64BitAddress`
+        """
+        self.__resp_addr = resp_addr
+
+    def __get_recv_addr(self):
+        """
+        Returns the 64-bit receiver address.
+
+        Returns:
+            :class:`XBee64BitAddress`: the 64-bit receiver address.
+
+        .. seealso::
+           | :class:`.XBee64BitAddress`
+        """
+        return self.__recv_addr
+
+    def __set_recv_addr(self, recv_addr):
+        """
+        Sets the 64-bit receiver address.
+
+        Args:
+            src_addr (:class:`.XBee64BitAddress`): the new 64-bit receiver address.
+
+        .. seealso::
+           | :class:`.XBee64BitAddress`
+        """
+        self.__recv_addr = recv_addr
+
+    source_event = property(__get_source_event, __set_source_event)
+    """Integer: the 8-bit source event"""
+
+    data_length = property(__get_data_length)
+    """Integer: the length of subsequent bytes, excluding checksum"""
+
+    timestamp = property(__get_timestamp, __set_timestamp)
+    """Integer: the timestamp of the packet"""
+
+    timeout_count = property(__get_timeout_count, __set_timeout_count)
+    """Integer: the discovery status."""
+
+    dest_addr = property(__get_dest_addr, __set_dest_addr)
+    """:class:`XBee64BitAddress`: the 64-bit destination address."""
+
+    src_addr = property(__get_src_addr, __get_src_addr)
+    """:class:`XBee64BitAddress`: the 64-bit destination address."""
+
+    resp_addr = property(__get_resp_addr, __set_resp_addr)
+    """:class:`XBee64BitAddress`: the 64-bit destination address."""
+
+    recv_addr = property(__get_recv_addr, __get_recv_addr)
+    """:class:`XBee64BitAddress`: the 64-bit destination address."""
+
+#######################################################################################################
 
 class IODataSampleRxIndicatorPacket(XBeeAPIPacket):
     """
