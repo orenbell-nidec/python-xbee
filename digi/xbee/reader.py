@@ -1076,12 +1076,14 @@ class XBeeQueue(Queue):
         if xbee_packet.get_frame_type() == ApiFrameType.RECEIVE_PACKET:
             if xbee_packet.x64bit_source_addr == remote_xbee_device.get_64bit_addr():
                 return True
-            return xbee_packet.x16bit_source_addr == remote_xbee_device.get_16bit_addr()
+            return (remote_xbee_device.get_protocol() in [XBeeProtocol.ZIGBEE, XBeeProtocol.RAW_802_15_4, XBeeProtocol.DIGI_POINT]
+                    and return xbee_packet.x16bit_source_addr == remote_xbee_device.get_16bit_addr())
 
         elif xbee_packet.get_frame_type() == ApiFrameType.REMOTE_AT_COMMAND_RESPONSE:
             if xbee_packet.x64bit_source_addr == remote_xbee_device.get_64bit_addr():
                 return True
-            return xbee_packet.x16bit_source_addr == remote_xbee_device.get_16bit_addr()
+            return (remote_xbee_device.get_protocol() in [XBeeProtocol.ZIGBEE, XBeeProtocol.RAW_802_15_4, XBeeProtocol.DIGI_POINT]
+                    and xbee_packet.x16bit_source_addr == remote_xbee_device.get_16bit_addr())
 
         elif xbee_packet.get_frame_type() == ApiFrameType.RX_16:
             return xbee_packet.x16bit_source_addr == remote_xbee_device.get_16bit_addr()
